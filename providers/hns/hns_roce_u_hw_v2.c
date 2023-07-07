@@ -477,9 +477,17 @@ static void handle_recv_rq_inl(struct hns_roce_v2_cqe *cqe,
 	handle_recv_inl_data(cqe, &cur_qp->rq_rinl_buf, wr_num, wqe_buf);
 }
 
+static const uint8_t pktype_for_ud[] = {
+	HNS_ROCE_PKTYPE_ROCE_V1,
+	HNS_ROCE_PKTYPE_ROCE_V2_IPV4,
+	HNS_ROCE_PKTYPE_ROCE_V2_IPV6
+};
+
 static void parse_for_ud_qp(struct hns_roce_v2_cqe *cqe, struct ibv_wc *wc)
 {
-	wc->sl = hr_reg_read(cqe, CQE_SL);
+	uint8_t port_type =  hr_reg_read(cqe, CQE_PORT_TYPE);
+
+	wc->sl = pktype_for_ud[port_type];
 	wc->src_qp = hr_reg_read(cqe, CQE_RMT_QPN);
 	wc->slid = 0;
 	wc->wc_flags |= hr_reg_read(cqe, CQE_GRH) ? IBV_WC_GRH : 0;
@@ -1313,7 +1321,8 @@ out:
 
 		udma_to_device_barrier();
 
-		if (nreq == 1 && (qp->flags & HNS_ROCE_QP_CAP_DIRECT_WQE))
+		if (nreq == 1 && !ret &&
+		    (qp->flags & HNS_ROCE_QP_CAP_DIRECT_WQE))
 			hns_roce_write_dwqe(qp, wqe);
 		else
 			hns_roce_update_sq_db(ctx, qp);
@@ -1415,15 +1424,15 @@ static int hns_roce_u_v2_post_recv(struct ibv_qp *ibvqp, struct ibv_recv_wr *wr,
 
 	max_sge = qp->rq.max_gs - qp->rq.rsv_sge;
 	for (nreq = 0; wr; ++nreq, wr = wr->next) {
-		if (hns_roce_v2_wq_overflow(&qp->rq, nreq,
-					    to_hr_cq(qp->verbs_qp.qp.recv_cq))) {
-			ret = ENOMEM;
+		if (wr->num_sge > max_sge) {
+			ret = max_sge > 0 ? EINVAL : EOPNOTSUPP;
 			*bad_wr = wr;
 			goto out;
 		}
 
-		if (wr->num_sge > max_sge) {
-			ret = EINVAL;
+		if (hns_roce_v2_wq_overflow(&qp->rq, nreq,
+					    to_hr_cq(qp->verbs_qp.qp.recv_cq))) {
+			ret = ENOMEM;
 			*bad_wr = wr;
 			goto out;
 		}
@@ -1920,8 +1929,11 @@ static uint32_t wc_read_slid(struct ibv_cq_ex *current)
 static uint8_t wc_read_sl(struct ibv_cq_ex *current)
 {
 	struct hns_roce_cq *cq = to_hr_cq(ibv_cq_ex_to_cq(current));
+	uint8_t port_type;
 
-	return (uint8_t)hr_reg_read(cq->cqe, CQE_SL);
+	port_type = hr_reg_read(cq->cqe, CQE_PORT_TYPE);
+
+	return pktype_for_ud[port_type];
 }
 
 static uint8_t wc_read_dlid_path_bits(struct ibv_cq_ex *current)
@@ -1989,6 +2001,9 @@ init_rc_wqe(struct hns_roce_qp *qp, uint64_t wr_id, unsigned int opcode)
 
 	qp->sq.wrid[wqe_idx] = wr_id;
 	qp->cur_wqe = wqe;
+
+	enable_wqe(qp, wqe, qp->sq.head);
+
 	qp->sq.head++;
 
 	return wqe;
@@ -2010,9 +2025,6 @@ static void wr_set_sge_rc(struct ibv_qp_ex *ibv_qp, uint32_t lkey,
 	wqe->msg_len = htole32(length);
 	hr_reg_write(wqe, RCWQE_LEN0, length);
 	hr_reg_write(wqe, RCWQE_SGE_NUM, !!length);
-	/* ignore ex sge start index */
-
-	enable_wqe(qp, wqe, qp->sq.head);
 }
 
 static void set_sgl_rc(struct hns_roce_v2_wqe_data_seg *dseg,
@@ -2315,6 +2327,9 @@ init_ud_wqe(struct hns_roce_qp *qp, uint64_t wr_id, unsigned int opcode)
 
 	qp->sq.wrid[wqe_idx] = wr_id;
 	qp->cur_wqe = wqe;
+
+	enable_wqe(qp, wqe, qp->sq.head);
+
 	qp->sq.head++;
 
 	return wqe;
@@ -2384,7 +2399,6 @@ static void wr_set_sge_ud(struct ibv_qp_ex *ibv_qp, uint32_t lkey,
 	dseg->len = htole32(length);
 
 	qp->sge_info.start_idx++;
-	enable_wqe(qp, wqe, qp->sq.head);
 }
 
 static void wr_set_sge_list_ud(struct ibv_qp_ex *ibv_qp, size_t num_sge,
