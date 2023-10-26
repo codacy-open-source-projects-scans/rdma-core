@@ -1002,9 +1002,9 @@ static int bnxt_re_check_qp_limits(struct bnxt_re_context *cntx,
 	if (attr->cap.max_inline_data > BNXT_RE_MAX_INLINE_SIZE)
 		return EINVAL;
 	if (attr->cap.max_send_wr > devattr->max_qp_wr)
-		attr->cap.max_send_wr = devattr->max_qp_wr;
+		return EINVAL;
 	if (attr->cap.max_recv_wr > devattr->max_qp_wr)
-		attr->cap.max_recv_wr = devattr->max_qp_wr;
+		return EINVAL;
 
 	return 0;
 }
@@ -1035,10 +1035,9 @@ static int bnxt_re_alloc_queue_ptr(struct bnxt_re_qp *qp,
 
 	if (!attr->srq) {
 		qp->jrqq = calloc(1, sizeof(struct bnxt_re_joint_queue));
-		if (!qp->jrqq) {
-			free(qp->jsqq);
+		if (!qp->jrqq)
 			goto fail;
-		}
+
 		qp->jrqq->hwque = calloc(1, sizeof(struct bnxt_re_queue));
 		if (!qp->jrqq->hwque)
 			goto fail;
