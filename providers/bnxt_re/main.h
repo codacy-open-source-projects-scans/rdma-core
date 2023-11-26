@@ -146,6 +146,7 @@ struct bnxt_re_qpcap {
 	uint32_t max_rsge;
 	uint32_t max_inline;
 	uint8_t	sqsig;
+	uint8_t is_atomic_cap;
 };
 
 struct bnxt_re_srq {
@@ -536,6 +537,12 @@ static inline void bnxt_re_jqq_mod_last(struct bnxt_re_joint_queue *jqq,
 					uint32_t idx)
 {
 	jqq->last_idx = jqq->swque[idx].next_idx;
+}
+
+static inline uint32_t bnxt_re_init_depth(uint32_t ent, uint64_t cmask)
+{
+	return cmask & BNXT_RE_COMP_MASK_UCNTX_POW2_DISABLED ?
+		ent : roundup_pow_of_two(ent);
 }
 
 /* Helper function to copy to push buffers */
