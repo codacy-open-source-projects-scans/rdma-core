@@ -96,6 +96,8 @@ int bnxt_re_arm_cq(struct ibv_cq *ibvcq, int flags);
 
 struct ibv_qp *bnxt_re_create_qp(struct ibv_pd *ibvpd,
 				 struct ibv_qp_init_attr *attr);
+struct ibv_qp *bnxt_re_create_qp_ex(struct ibv_context *cntx,
+				    struct ibv_qp_init_attr_ex *attr);
 int bnxt_re_modify_qp(struct ibv_qp *ibvqp, struct ibv_qp_attr *attr,
 		      int ibv_qp_attr_mask);
 int bnxt_re_query_qp(struct ibv_qp *ibvqp, struct ibv_qp_attr *attr,
@@ -118,6 +120,9 @@ int bnxt_re_post_srq_recv(struct ibv_srq *ibvsrq, struct ibv_recv_wr *wr,
 struct ibv_ah *bnxt_re_create_ah(struct ibv_pd *ibvpd,
 				 struct ibv_ah_attr *attr);
 int bnxt_re_destroy_ah(struct ibv_ah *ibvah);
+struct ibv_flow *bnxt_re_create_flow(struct ibv_qp *qp,
+				     struct ibv_flow_attr *flow);
+int bnxt_re_destroy_flow(struct ibv_flow *flow);
 void bnxt_re_async_event(struct ibv_context *context,
 			 struct ibv_async_event *event);
 
