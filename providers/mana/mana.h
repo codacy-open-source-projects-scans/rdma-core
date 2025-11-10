@@ -157,7 +157,7 @@ struct mana_cq {
 
 	pthread_spinlock_t lock;
 	uint32_t head;
-	uint32_t last_armed_head;
+	uint32_t poll_credit;
 	void *db_page;
 	/* list of qp's that use this cq for send completions */
 	struct list_head send_qp_list;
@@ -182,7 +182,8 @@ struct mana_parent_domain {
 
 struct mana_context *to_mctx(struct ibv_context *ibctx);
 
-void *mana_alloc_mem(uint32_t size);
+void *mana_alloc_mem(size_t size);
+void mana_dealloc_mem(void *buf, size_t size);
 
 int mana_query_device_ex(struct ibv_context *context,
 			 const struct ibv_query_device_ex_input *input,
