@@ -816,7 +816,7 @@ static inline int efa_poll_sub_cq(struct efa_cq *cq, struct efa_sub_cq *sub_cq,
 		 * from the table.
 		 */
 		*cur_qp = ctx->qp_table[qpn & ctx->qp_table_sz_m1];
-		if (!*cur_qp) {
+		if (!*cur_qp || qpn != (*cur_qp)->verbs_qp.qp.qp_num) {
 			cq->cur_wq = NULL;
 			verbs_err(&ctx->ibvctx,
 				  "QP[%u] does not exist in QP table\n",
@@ -1057,7 +1057,8 @@ static void efa_cq_fill_pfns(struct efa_cq *cq,
 	if (cq->num_sub_cqs == 1)
 		cq_pfns_mask |= SINGLE_SUB_CQ_PFNS;
 
-	if (attr->flags & IBV_CREATE_CQ_ATTR_SINGLE_THREADED)
+	if ((cq->parent_domain && cq->parent_domain->td) ||
+	    attr->flags & IBV_CREATE_CQ_ATTR_SINGLE_THREADED)
 		cq_pfns_mask |= SINGLE_THREAD_PFNS;
 
 	cq_ops = &base_ops[cq_pfns_mask];
